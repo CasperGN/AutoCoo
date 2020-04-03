@@ -1,0 +1,19 @@
+Vagrant.configure("2") do |config|
+  config.vm.define "ubuntu" do |ubuntu|
+      ubuntu.vm.provider "virtualbox" do |vb,override|
+      vb.name = "linux"
+      vb.memory = "1024"
+      vb.cpus = 1
+      vb.customize ["modifyvm", :id, "--hwvirtex", "off"]
+    end
+    ubuntu.vm.box = "ubuntu/trusty64"
+    ubuntu.vm.network "private_network", ip: "192.168.112.10"
+    ubuntu.vm.provision "file", source: "/home/cuckoo/.cuckoo/agent/agent.py", destination: "/home/vagrant/agent.py"
+    ubuntu.vm.provision "shell", inline: "chmod +x /home/vagrant/agent.py"
+    ubuntu.vm.provision "shell", inline: "echo 'start on runlevel [2345]' >> /home/vagrant/agentstarter.conf"
+    ubuntu.vm.provision "shell", inline: "echo 'stop on runlevel [!2345]' >> /home/vagrant/agentstarter.conf"
+    ubuntu.vm.provision "shell", inline: "echo '' >> /home/vagrant/agentstarter.conf"
+    ubuntu.vm.provision "shell", inline: "echo 'exec /home/vagrant/agent.py' >> /home/vagrant/agentstarter.conf"
+    ubuntu.vm.provision "shell", inline: "mv /home/vagrant/agentstarter.conf /etc/init/"
+  end
+end

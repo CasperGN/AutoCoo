@@ -1,0 +1,318 @@
+---
+- name: Deploy sandbox
+  hosts: localhost
+  become: yes 
+  vars:
+    packages: ["python3", "python3-pip", "openssl", "python", "python-pip", "python-dev", "libffi-dev", "libssl-dev", "python-virtualenv", "python-setuptools", "libjpeg-dev", "zlib1g-dev", "swig", "tcpdump", "apparmor-utils", "git", "yara", "libfreetype6-dev", "liblcms2-dev", "libwebp-dev", "libharfbuzz-dev", "libfribidi-dev", "tcl8.6-dev", "tk8.6-dev", "python-tk", "libguac-client-rdp0", "libguac-client-vnc0", "libguac-client-ssh0", "guacd", "gcc-multilib", "g++-multilib", "unzip", "mongodb-server", "libpng12-0", "virtualbox"]
+    cuckoo_conf: /home/cuckoo/.cuckoo/conf/
+
+  tasks:
+  - name: Add old repo to fetch libpng12-0
+    become: yes
+    become_user: root
+    command: add-apt-repository 'deb http://security.ubuntu.com/ubuntu xenial-security main'
+
+  - name: Provision groups
+    group:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - "vboxusers"
+      - "pcap"
+      - "cuckoo"
+
+  - name: Provision users
+    user:
+      name: cuckoo
+      comment: cuckoo user
+      groups: vboxusers,cuckoo,pcap
+      state: present
+
+  - name: Update repository list
+    apt:
+      update_cache: yes
+
+  - name: Upgrade system
+    apt:
+      upgrade: dist
+
+  - name: Install packages
+    apt:
+      pkg: "{{ packages }}"
+      state: present
+
+  - name: Change group ownership of tcpdump
+    file:
+      path: "/usr/sbin/tcpdump"
+      group: pcap
+
+  - name: Creating paths and directories
+    file:
+      path: "{{ item.path }}"
+      owner: "{{ item.owner }}"
+      group: "{{ item.group }}"
+      state: directory
+
+    with_items:
+      - { path: /usr/share/volatility, owner: cuckoo, group: cuckoo }
+
+  - name: Get Volatility from git
+    git:
+      repo: "https://github.com/volatilityfoundation/volatility.git"
+      dest: "/usr/share/volatility"
+      update: yes
+      
+  - name: Install modules with Pip
+    become: yes
+    become_user: cuckoo
+    pip:
+      name:
+        - wheel
+        - cffi
+      virtualenv: /home/cuckoo/cuckoo/
+      virtualenv_command: virtualenv
+      virtualenv_site_packages: no
+      virtualenv_python: python2.7
+
+  - name: Handle modules with specific version requirements
+    become: yes
+    become_user: cuckoo
+    pip:
+      name: "{{ item.name }}"
+      version: "{{ item.version }}"
+      virtualenv: /home/cuckoo/cuckoo/
+      virtualenv_command: virtualenv
+      virtualenv_site_packages: no
+      virtualenv_python: python2.7
+    with_items:
+      - { name: m2crypto, version: 0.24.0 }
+      - { name: openpyxl, version: 2.6.4 }
+      - { name: setuptools, version: 44.0.0 }
+      - { name: scapy, version: 2.3.2}
+      - { name: requests, version: 2.13.0 }
+      - { name: tinycss2, version: 0.6.1 }
+      - { name: cssselect2, version: 0.2.2 }
+      - { name: cairocffi, version: 0.9.0 }
+      - { name: weasyprint, version: 0.41 }
+
+  - name: Install modules with Pip
+    become: yes
+    become_user: cuckoo
+    pip:
+      name:
+        - distorm3
+        - pycrypto
+        - chardet
+        - six
+        - pyguacamole
+        - jsbeautifier
+        - ecdsa
+        - setuptools_scm
+        - toml
+        - idna
+        - pyOpenSSL
+      virtualenv: /home/cuckoo/cuckoo/
+      virtualenv_command: virtualenv
+      virtualenv_site_packages: no
+      virtualenv_python: python2.7
+
+  - name: Make up for issue with Capstone dependency
+    become: yes
+    become_user: cuckoo
+    get_url:
+      url: https://files.pythonhosted.org/packages/44/3f/2ae09118f1c890b98e7b87ff1ce3d3a36e8e72ddac74ddcf0bbe8f005210/capstone-3.0.5rc2.tar.gz
+      dest: /home/cuckoo/cuckoo/capstone-3.0.5rc2.tar.gz
+      checksum: sha256:c67a4e14d04b29126f6ae2a4aeb773acf96cc6705e1fa7bd9af1798fa928022a
+
+  - name: Install capstone
+    become: yes
+    become_user: cuckoo
+    shell:
+      chdir: /home/cuckoo/cuckoo
+      cmd: ". /home/cuckoo/cuckoo/bin/activate && env CC=/usr/bin/gcc pip install capstone-3.0.5rc2.tar.gz"
+
+  - name: Remove the fetched capstone file
+    become: yes
+    become_user: cuckoo
+    file:
+      path: /home/cuckoo/cuckoo/capstone-3.0.5rc2.tar.gz
+      state: absent
+
+  - name: Install volatility
+    become: yes
+    become_user: cuckoo
+    pip:
+      name: /usr/share/volatility/.
+      virtualenv: /home/cuckoo/cuckoo/
+      virtualenv_command: virtualenv
+      virtualenv_site_packages: no
+      virtualenv_python: python2.7
+
+  - name: Install Cuckoo
+    become: yes
+    become_user: cuckoo
+    pip:
+      name: cuckoo
+      virtualenv: /home/cuckoo/cuckoo/
+      virtualenv_command: virtualenv
+      virtualenv_site_packages: no
+      virtualenv_python: python2.7
+
+  - name: Fetch VirtualBox
+    get_url:
+      url: https://download.virtualbox.org/virtualbox/6.1.4/virtualbox-6.1_6.1.4-136177~Ubuntu~trusty_amd64.deb
+      dest: /tmp/virtualbox-6.1_6.1.4-136177~Ubuntu~trusty_amd64.deb
+
+  - name: Install VirtualBox
+    become: yes
+    become_user: root
+    apt:
+      deb: /tmp/virtualbox-6.1_6.1.4-136177~Ubuntu~trusty_amd64.deb
+
+  - name: Clean up of VirtualBox .deb file
+    become: yes
+    become_user: root
+    file:
+      path: /tmp/virtualbox-6.1_6.1.4-136177~Ubuntu~trusty_amd64.deb
+      state: absent
+
+  - name: Install Vagrant to provision machines for Cuckoo
+    become: yes
+    become_user: root
+    apt:
+      pkg: vagrant
+      state: present
+
+  - name: Install patched Vagrant binary
+    become: yes
+    become_user: cuckoo
+    get_url:
+      url: https://releases.hashicorp.com/vagrant/2.2.7/vagrant_2.2.7_linux_amd64.zip
+      dest: /home/cuckoo/vagrant_2.2.7_linux_amd64.zip
+
+  - name: Unzip Vagrant binary
+    become: yes
+    become_user: cuckoo
+    unarchive:
+      src: /home/cuckoo/vagrant_2.2.7_linux_amd64.zip
+      dest: /home/cuckoo
+      remote_src: yes
+
+  - name: Clean up of Vagrant .zip file
+    become: yes
+    become_user: root
+    file:
+      path: /home/cuckoo/vagrant_2.2.7_linux_amd64.zip
+      state: absent
+
+  - name: Copy config files for Vagrant to remote
+    become: yes
+    become_user: root
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+    with_items:
+      - { src: include/plugin.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/plugin.rb }
+      - { src: include/meta.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/driver/meta.rb }
+      - { src: include/version_5_0.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/driver/version_5_0.rb }
+      - { src: include/version_6_0.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/driver/version_6_0.rb }
+      - { src: include/version_6_1.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/driver/version_6_1.rb }
+
+  - name: Copy Vagrantfile to remote
+    become: yes
+    become_user: cuckoo
+    copy:
+      src: templates/Vagrantfile
+      dest: /home/cuckoo
+  
+  - name: Start Machines
+    become: yes
+    become_user: cuckoo
+    command:
+      chdir: /home/cuckoo
+      cmd: /home/cuckoo/vagrant up
+
+  - name: Take live snapshot of machine
+    become: yes
+    become_user: cuckoo
+    command:
+      cmd: "vboxmanage snapshot {{ item.vmname }} take {{ item.snapshotname }} --pause"
+    with_items:
+      - { vmname: linux, snapshotname: cuckoo_linux }
+
+  - name: Shutdown VM
+    become: yes
+    become_user: cuckoo
+    command: "vboxmanage controlvm {{ item }} poweroff"
+    with_items:
+      - linux
+
+  - name: restore to snapshot of machine
+    become: yes
+    become_user: cuckoo
+    command:
+      cmd: "vboxmanage snapshot {{ item }} restorecurrent"
+    with_items:
+      - linux
+
+  - name: Initialize Cuckoo
+    become: yes
+    become_user: cuckoo
+    shell: ". /home/cuckoo/cuckoo/bin/activate && python /home/cuckoo/cuckoo/bin/cuckoo"
+
+  - debug:
+      msg: "Provision of machines will start now. This task takes a long time - please be patient"
+
+  - name: Set environment variable to disable folder sharing
+    become: yes
+    become_user: cuckoo
+    shell: echo "VAGRANT_DISABLE_VBOXSYMLINKCREATE=1" >> ~/.bashrc && . ~/.bashrc
+
+  - name: Setting max open files
+    become: yes
+    become_user: root
+    sysctl:
+      name: fs.file-max
+      value: "10000"
+      state: present
+      reload: yes
+
+  - name: Permit cuckoo user to run tcpdump
+    become: yes
+    become_user: root
+    command: "setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump"
+
+  - name: Disable apparmor for tcpdump
+    become: yes
+    become_user: root
+    command: "aa-disable /usr/sbin/tcpdump"
+
+  - name: Copy config files for Vagrant to remote
+    become: yes
+    become_user: root
+    copy:
+      src: templates/{{ item }}.conf
+      dest: /home/cuckoo/.cuckoo/conf/{{ item }}.conf
+      owner: cuckoo
+      group: users
+      mode: u=rw,g=r,o=r
+    with_items:
+    - cuckoo
+    - reporting
+    - virtualbox
+
+  - name: Fetch the latest signatures from Cuckoo
+    become: yes
+    become_user: cuckoo
+    shell: 
+      chdir: /home/cuckoo
+      cmd: ". /home/cuckoo/cuckoo/bin/activate && cuckoo community"
+
+  - name: Ensure Mongodb is started
+    become: yes
+    become_user: root
+    service: 
+      name: mongodb
+      state: started
+  
+# TODO: Add playbook to install requirements per OS as of https://cuckoo.readthedocs.io/en/latest/installation/guest/requirements/
