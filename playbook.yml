@@ -212,11 +212,11 @@
       src: "{{ item.src }}"
       dest: "{{ item.dest }}"
     with_items:
-      - { src: include/plugin.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/plugin.rb }
-      - { src: include/meta.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/driver/meta.rb }
-      - { src: include/version_5_0.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/driver/version_5_0.rb }
-      - { src: include/version_6_0.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/driver/version_6_0.rb }
-      - { src: include/version_6_1.rb, dest: /usr/share/vagrant/plugins/providers/virtualbox/driver/version_6_1.rb }
+      - { src: include/plugin.rb, dest: /usr/share/rubygems-integration/all/gems/vagrant-2.0.2/plugins/providers/virtualbox/plugin.rb }
+      - { src: include/meta.rb, dest: /usr/share/rubygems-integration/all/gems/vagrant-2.0.2/plugins/providers/virtualbox/driver/meta.rb }
+      - { src: include/version_5_0.rb, dest: /usr/share/rubygems-integration/all/gems/vagrant-2.0.2/plugins/providers/virtualbox/driver/version_5_0.rb }
+      - { src: include/version_6_0.rb, dest: /usr/share/rubygems-integration/all/gems/vagrant-2.0.2/plugins/providers/virtualbox/driver/version_6_0.rb }
+      - { src: include/version_6_1.rb, dest: /usr/share/rubygems-integration/all/gems/vagrant-2.0.2/plugins/providers/virtualbox/driver/version_6_1.rb }
 
   - name: Copy Vagrantfile to remote
     become: yes
