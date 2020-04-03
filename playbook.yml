@@ -158,24 +158,6 @@
       virtualenv_site_packages: no
       virtualenv_python: python2.7
 
-  - name: Fetch VirtualBox
-    get_url:
-      url: https://download.virtualbox.org/virtualbox/6.1.4/virtualbox-6.1_6.1.4-136177~Ubuntu~trusty_amd64.deb
-      dest: /tmp/virtualbox-6.1_6.1.4-136177~Ubuntu~trusty_amd64.deb
-
-  - name: Install VirtualBox
-    become: yes
-    become_user: root
-    apt:
-      deb: /tmp/virtualbox-6.1_6.1.4-136177~Ubuntu~trusty_amd64.deb
-
-  - name: Clean up of VirtualBox .deb file
-    become: yes
-    become_user: root
-    file:
-      path: /tmp/virtualbox-6.1_6.1.4-136177~Ubuntu~trusty_amd64.deb
-      state: absent
-
   - name: Install Vagrant to provision machines for Cuckoo
     become: yes
     become_user: root
